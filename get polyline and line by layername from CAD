@@ -1,0 +1,63 @@
+import clr
+
+clr.AddReference("RevitNodes")
+import Revit
+# Import ToProtoType, ToRevitType geometry conversion extension methods
+clr.ImportExtensions(Revit.GeometryConversion)
+
+clr.AddReference("RevitServices")
+import RevitServices
+from RevitServices.Persistence import DocumentManager
+from RevitServices.Transactions import TransactionManager
+from System.Collections.Generic import *
+
+# Import RevitAPI
+clr.AddReference("RevitAPI")
+import Autodesk
+from Autodesk.Revit.DB import *
+#
+import clr
+clr.AddReference("System.Collections")
+from System.Collections.Generic import List
+#
+
+doc = DocumentManager.Instance.CurrentDBDocument
+uiapp = DocumentManager.Instance.CurrentUIApplication
+app = uiapp.Application
+
+importDWG = UnwrapElement(IN[0])
+nameOfLayersToImport = IN[1]
+
+if isinstance(nameOfLayersToImport, list):
+	layerList = nameOfLayersToImport
+else:
+	layerList = [nameOfLayersToImport]
+	
+TransactionManager.Instance.EnsureInTransaction(doc)
+geomEnum = importDWG.Geometry[ Options() ].GetEnumerator()
+
+geoout = []
+while geomEnum.MoveNext(): 
+	instGeom = geomEnum.Current.GetInstanceGeometry()
+	instGeomEnum = instGeom.GetEnumerator()
+	while instGeomEnum.MoveNext():
+		e = instGeomEnum.Current
+		try:
+			graphicStyleId = e.GraphicsStyleId				
+			eleGraphicStyle = doc.GetElement(graphicStyleId)
+			eleGraphicStyleName = eleGraphicStyle.GraphicsStyleCategory.Name			
+			if eleGraphicStyleName in layerList: 
+				geoout.append(e)
+
+		except:
+			pass		
+TransactionManager.Instance.TransactionTaskDone()
+
+dblines,dbpolylines=[],[]
+for g in geoout:
+	if str(g.GetType())== "Autodesk.DB.Line":
+		dblines.append(g)
+	else:
+		dbpolylines.append(g)
+
+OUT = dbpolylines,dblines
